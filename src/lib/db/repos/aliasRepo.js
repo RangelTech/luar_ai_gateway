@@ -24,15 +24,24 @@ function customKey(providerAlias, id, type) {
   return `${providerAlias}|${id}|${type}`;
 }
 
-export async function getCustomModels() {
+// Custom models are operator-scoped by default, but the BFF may pass the
+// account tenant. Keep the old keys intact for the local operator while
+// making tenant rows impossible to enumerate from another tenant.
+function scopedCustomKey(tenantId, providerAlias, id, type) {
+  return tenantId ? `tenant:${tenantId}:${customKey(providerAlias, id, type)}` : customKey(providerAlias, id, type);
+}
+
+export async function getCustomModels(tenantId = null) {
   const all = await customKv.getAll();
-  return Object.values(all);
+  return Object.entries(all)
+    .filter(([key, value]) => tenantId ? value?.tenantId === tenantId : !key.startsWith("tenant:"))
+    .map(([, value]) => value);
 }
 
 // Atomic upsert inside transaction to prevent duplicate races.
 // Re-adding an existing model updates caps/name/transport without resetting omitted fields.
-export async function addCustomModel({ providerAlias, id, type = "llm", name, caps, transport }) {
-  const k = customKey(providerAlias, id, type);
+export async function addCustomModel({ providerAlias, id, type = "llm", name, caps, transport, tenantId = null }) {
+  const k = scopedCustomKey(tenantId, providerAlias, id, type);
   const db = await getAdapter();
   let added = false;
   db.transaction(() => {
@@ -43,15 +52,15 @@ export async function addCustomModel({ providerAlias, id, type = "llm", name, ca
       db.run(`UPDATE kv SET value = ? WHERE scope = 'customModels' AND key = ?`, [stringifyJson(next), k]);
       return;
     }
-    const value = stringifyJson({ providerAlias, id, type, name: name || id, ...(caps ? { caps } : {}), ...(transport ? { transport } : {}) });
+    const value = stringifyJson({ providerAlias, id, type, name: name || id, ...(tenantId ? { tenantId } : {}), ...(caps ? { caps } : {}), ...(transport ? { transport } : {}) });
     db.run(`INSERT INTO kv(scope, key, value) VALUES('customModels', ?, ?)`, [k, value]);
     added = true;
   });
   return added;
 }
 
-export async function deleteCustomModel({ providerAlias, id, type = "llm" }) {
-  await customKv.remove(customKey(providerAlias, id, type));
+export async function deleteCustomModel({ providerAlias, id, type = "llm", tenantId = null }) {
+  await customKv.remove(scopedCustomKey(tenantId, providerAlias, id, type));
 }
 
 // mitmAlias: key=toolName, value=mappings object

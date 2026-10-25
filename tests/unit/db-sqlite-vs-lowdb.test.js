@@ -272,6 +272,17 @@ describe("DB SQLite layer — public API parity", () => {
     expect(after.find((m) => m.id === "m1")).toBeUndefined();
   });
 
+  it("customModels: tenant rows are isolated from the operator and other tenants", async () => {
+    await sqliteDb.addCustomModel({ providerAlias: "p1", id: "operator", tenantId: null });
+    await sqliteDb.addCustomModel({ providerAlias: "p1", id: "tenant-a", tenantId: "tenant-a" });
+    await sqliteDb.addCustomModel({ providerAlias: "p1", id: "tenant-b", tenantId: "tenant-b" });
+
+    expect((await sqliteDb.getCustomModels()).map((m) => m.id)).toContain("operator");
+    expect((await sqliteDb.getCustomModels()).map((m) => m.id)).not.toContain("tenant-a");
+    expect((await sqliteDb.getCustomModels("tenant-a")).map((m) => m.id)).toEqual(["tenant-a"]);
+    expect((await sqliteDb.getCustomModels("tenant-b")).map((m) => m.id)).toEqual(["tenant-b"]);
+  });
+
   it("mitmAlias: get/set per tool", async () => {
     await sqliteDb.setMitmAliasAll("cursor", { "gpt-5": "claude-3" });
     const a = await sqliteDb.getMitmAlias("cursor");

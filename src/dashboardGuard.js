@@ -211,6 +211,7 @@ const TENANT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const SERVICE_TENANT_PATHS = [
   /^\/api\/providers$/, /^\/api\/providers\/validate$/,
   /^\/api\/providers\/(?!client$|test-batch$|suggested-models$)[^/]+$/, /^\/api\/providers\/[^/]+\/(test|models)$/,
+  /^\/api\/models\/custom$/,
   /^\/api\/combos(\/[^/]+)?$/, /^\/api\/keys(\/[^/]+)?$/,
   /^\/api\/provider-nodes(\/validate|\/[^/]+)?$/,
   /^\/api\/oauth\/(?!.*(start-proxy|stop-proxy|poll-status|register-session|ide-status|auto-import)).+/,

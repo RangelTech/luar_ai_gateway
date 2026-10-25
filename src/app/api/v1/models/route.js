@@ -358,9 +358,9 @@ export async function buildModelsList(kindFilter, options = {}) {
 
   let customModels = [];
   try {
-    // estrito + tenant: modelos custom/aliases globais sao do operador, nao entram na lista do tenant
-    const operatorScope = !(isStrict() && options.tenantId);
-    customModels = operatorScope ? await getCustomModels() : [];
+    // Modelos customizados acompanham o tenant da chave em modo estrito; os
+    // registros globais continuam sendo exclusivos do operador.
+    customModels = await getCustomModels(isStrict() ? options.tenantId : null);
   } catch (e) {
     console.log("Could not fetch custom models");
   }

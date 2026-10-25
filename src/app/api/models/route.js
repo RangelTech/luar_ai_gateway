@@ -4,10 +4,12 @@ import { getDisabledModels } from "@/lib/disabledModelsDb";
 import { AI_MODELS } from "@/shared/constants/config";
 import { getProviderAlias, ALIAS_TO_ID } from "@/shared/constants/providers";
 import { getCapabilitiesForModel } from "open-sse/providers/capabilities.js";
+import { tenantIdFromRequest } from "@/lib/tenancy.js";
 
 // GET /api/models - Get models with aliases
-export async function GET() {
+export async function GET(request) {
   try {
+    const tenantId = tenantIdFromRequest(request);
     const modelAliases = await getModelAliases();
     const disabled = await getDisabledModels();
 
@@ -48,7 +50,7 @@ export async function GET() {
     // provider-scoped entries and falls back to the generic patterns.
     const seenFull = new Set(models.map((m) => m.fullModel));
     const seenRouted = new Set(models.map((m) => m.routedModel));
-    const customModels = (await getCustomModels()).filter((m) => {
+    const customModels = (await getCustomModels(tenantId)).filter((m) => {
       if (!m?.id || (m.kind || m.type || "llm") !== "llm") return false;
       if (seenRouted.has(`${m.providerAlias}/${m.id}`)) return false;
       return !seenFull.has(`${m.providerAlias}/${m.id}`);

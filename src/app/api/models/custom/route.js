@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCustomModels, addCustomModel, deleteCustomModel } from "@/models";
+import { tenantIdFromRequest } from "@/lib/tenancy.js";
 import { CAPACITY_META, isSttTransport } from "@/shared/constants/models";
 
 export const dynamic = "force-dynamic";
@@ -25,9 +26,9 @@ function sanitizeTransport(transport, type) {
 }
 
 // GET /api/models/custom - List all custom models
-export async function GET() {
+export async function GET(request) {
   try {
-    const models = await getCustomModels();
+    const models = await getCustomModels(tenantIdFromRequest(request));
     return NextResponse.json({ models });
   } catch (error) {
     console.log("Error fetching custom models:", error);
@@ -44,7 +45,7 @@ export async function POST(request) {
     }
     const cleanCaps = sanitizeCaps(caps);
     const cleanTransport = sanitizeTransport(transport, type || "llm");
-    const added = await addCustomModel({ providerAlias, id, type: type || "llm", name, ...(cleanCaps ? { caps: cleanCaps } : {}), ...(cleanTransport ? { transport: cleanTransport } : {}) });
+    const added = await addCustomModel({ providerAlias, id, type: type || "llm", name, tenantId: tenantIdFromRequest(request), ...(cleanCaps ? { caps: cleanCaps } : {}), ...(cleanTransport ? { transport: cleanTransport } : {}) });
     return NextResponse.json({ success: true, added });
   } catch (error) {
     console.log("Error adding custom model:", error);
@@ -62,7 +63,7 @@ export async function DELETE(request) {
     if (!providerAlias || !id) {
       return NextResponse.json({ error: "providerAlias and id required" }, { status: 400 });
     }
-    await deleteCustomModel({ providerAlias, id, type });
+    await deleteCustomModel({ providerAlias, id, type, tenantId: tenantIdFromRequest(request) });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.log("Error deleting custom model:", error);
