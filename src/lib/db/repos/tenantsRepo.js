@@ -69,7 +69,10 @@ export async function deleteTenantCascade(id, { purgeUsage = false } = {}) {
 }
 
 // Uso agregado do tenant (usageHistory.tenantId, preenchido na gravacao e pela migracao 003).
-// opts: sinceIso, untilIso. Retorna totais + quebra por provedor, modelo real, combo pedido e dia (UTC).
+// opts: sinceIso, untilIso. Retorna totais + quebra por provedor, modelo real,
+// combo pedido, dia e hora (UTC). A hora fica no próprio agregado tenant-scoped;
+// o painel LUAR não precisa pedir logs ou dados de outra empresa para desenhar
+// o gráfico de atividade.
 export async function getTenantUsage(id, { sinceIso = null, untilIso = null } = {}) {
   const db = await getAdapter();
   const params = [id];
@@ -88,6 +91,7 @@ export async function getTenantUsage(id, { sinceIso = null, untilIso = null } = 
     byModel: db.all(`SELECT uh.provider AS provider, uh.model AS model, ${sums} FROM usageHistory uh WHERE ${where} GROUP BY uh.provider, uh.model ORDER BY requests DESC LIMIT 200`, params),
     byCombo: group("COALESCE(uh.requestedModel, '')", "combo"),
     byDay: group("substr(uh.timestamp, 1, 10)", "day", "day ASC", 400),
+    byHour: group("substr(uh.timestamp, 1, 13)", "hour", "hour ASC", 720),
   };
 }
 
