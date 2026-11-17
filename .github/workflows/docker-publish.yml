@@ -64,7 +64,9 @@ jobs:
           docker buildx build --platform linux/amd64 --load -t "$IMAGE" .
           docker save "$IMAGE" | gzip -n > llm-gateway.image.tar.gz
           SHA="$(sha256sum llm-gateway.image.tar.gz | awk '{print $1}')"
-          IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
+          # digest da config lido do proprio tar (o mesmo que o deploy.sh confere); com o
+          # containerd store do runner, `docker image inspect .Id` devolve outro digest.
+          IMAGE_ID="sha256:$(gunzip -c llm-gateway.image.tar.gz | tar -xO manifest.json | python3 -c "import sys,json,re;print(re.sub(r'^.*/','',json.load(sys.stdin)[0]['Config']).replace('.json',''))")"
           export SHA IMAGE_ID
           python3 - <<'PY'
           import json, os
