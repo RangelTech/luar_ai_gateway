@@ -3,8 +3,14 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useNotificationStore } from "@/store/notificationStore";
+import { useTenantStore } from "@/store/tenantStore";
+import { installTenantFetch } from "@/shared/utils/tenantFetch";
 import Sidebar from "../Sidebar";
 import Header from "../Header";
+
+// Antes do primeiro render: os efeitos das paginas (filhos) rodam antes dos do
+// layout, entao o escopo de tenant precisa estar no fetch ja na carga do modulo.
+installTenantFetch();
 
 function getToastStyle(type) {
   if (type === "success") {
@@ -36,6 +42,9 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const notifications = useNotificationStore((state) => state.notifications);
   const removeNotification = useNotificationStore((state) => state.removeNotification);
+  // Trocar o tenant no seletor recarrega a pagina atual inteira (todas as telas
+  // refazem suas buscas ja no escopo novo).
+  const selectedTenantId = useTenantStore((s) => s.selectedTenantId);
 
   // Preload heavy usage charts in background when browser is idle
   useEffect(() => {
@@ -114,7 +123,7 @@ export default function DashboardLayout({ children }) {
         <div className="landing-grid absolute inset-0 pointer-events-none -z-10" aria-hidden="true" />
         <Header key={pathname} onMenuClick={() => setSidebarOpen(true)} />
         <div className={`flex-1 overflow-y-auto custom-scrollbar ${pathname === "/dashboard/basic-chat" ? "" : "p-6 lg:p-10"} ${pathname === "/dashboard/basic-chat" ? "flex flex-col overflow-hidden" : ""}`}>
-          <div className={`${pathname === "/dashboard/basic-chat" ? "flex-1 w-full h-full flex flex-col" : "max-w-7xl mx-auto"}`}>{children}</div>
+          <div className={`${pathname === "/dashboard/basic-chat" ? "flex-1 w-full h-full flex flex-col" : "max-w-7xl mx-auto"}`} key={selectedTenantId || "global"}>{children}</div>
         </div>
       </main>
     </div>

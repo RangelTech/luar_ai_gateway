@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
 import { Modal, Button, Input } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
+import TenantScopeNotice from "./TenantScopeNotice";
 
 // Providers using the dynamic-port local callback proxy.
 // Browser OAuth: popup → auto callback → auto exchange → poll-status.
@@ -764,6 +765,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
   return (
     <Modal isOpen={isOpen} title={modalTitle} onClose={handleClose} size="lg">
       <div className="flex flex-col gap-4">
+        {step !== "success" && <TenantScopeNotice />}
         {/* Proxy OAuth (trae/windsurf/zed): browser flow; paste-token only when configured */}
         {PROXY_OAUTH_PROVIDERS.has(provider) && (step === "waiting" || step === "input" || step === "error") && (
           <>
@@ -981,7 +983,11 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
               <span className="material-symbols-outlined text-3xl text-red-600">error</span>
             </div>
             <h3 className="text-lg font-semibold mb-2">Connection Failed</h3>
-            <p className="text-sm text-red-600 mb-4">{error}</p>
+            <p className="text-sm text-red-600 mb-4">
+              {/tenantId is required/i.test(error || "")
+                ? "No tenant selected. Pick a tenant in the selector at the top of the page and try again."
+                : error}
+            </p>
             <div className="flex gap-2">
               <Button onClick={startOAuthFlow} variant="secondary" fullWidth>
                 Try Again

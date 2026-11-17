@@ -6,6 +6,7 @@ import { Button, Badge, Input, Modal, Select } from "@/shared/components";
 import { AI_PROVIDERS } from "@/shared/constants/providers";
 import { planBulkAdd } from "@/shared/utils/bulkAdd";
 import { useTenantStore } from "@/store/tenantStore";
+import TenantScopeNotice from "@/shared/components/TenantScopeNotice";
 
 const BULK_PLACEHOLDER = `name1|sk-key1\nname2|sk-key2\nsk-key-only-auto-named`;
 
@@ -227,6 +228,7 @@ export default function AddApiKeyModal({ isOpen, provider, providerName, isCompa
   return (
     <Modal isOpen={isOpen} title={`Add ${providerName || provider} ${credentialLabel}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
+        <TenantScopeNotice />
         {/* Mode switcher. Hidden for AWS credentials: bulk lines carry only a key, so a
             Bedrock entry would be saved with no access key id or profile and never work. */}
         {!usesAwsCredentialForm && (
