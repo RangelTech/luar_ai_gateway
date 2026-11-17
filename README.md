@@ -1,3 +1,59 @@
+# luar_ai_gateway
+
+Gateway de LLM multi-tenant do Luar: cada empresa conecta seus próprios provedores, monta seus combos (ordem, rodízio e fallback de modelos) e recebe uma chave de API que só alcança o que é dela. Roda como um serviço interno chamado `llm-gateway`, sem porta pública.
+
+> Nome anterior: `9router-multitenant` (fork de [decolua/9router](https://github.com/decolua/9router), MIT). O GitHub redireciona o endereço antigo. LICENSE e créditos do upstream ficam intactos.
+
+## Onde ele se encaixa
+
+```
+ luar_chatwoot (telas Provedores, Combos, Cotas, Custos) --BFF, x-admin-token + x-tenant-id--> luar_ai_gateway
+ luar_harness (Hermes) --chave de run, só o combo do template-----------------------------> luar_ai_gateway
+ luar_engine  (template escolhe o combo) --------------------------------------------------> luar_ai_gateway
+ luar_ai_gateway --> provedores de modelo (conta de cada empresa)
+```
+
+Entrega: `docker-publish.yml` gera `llm-gateway.image.tar.gz` e o manifesto; o `vps_rt_infra` implanta por digest.
+
+## O que o fork acrescenta (e onde está)
+
+```
+src/, open-sse/       código do 9Router com o filtro por tenant em toda a cadeia de pedido
+tests/unit/multi-tenant-isolation.test.js   prova do isolamento (gate de CI)
+docs/multitenant/BFF-API.md                 contrato da API administrativa usada pelo BFF
+deploy/llm-gateway/                         compose de produção, backup.sh, regras de saída (egress)
+.github/workflows/                          docker-publish.yml (release por digest), multitenant.yml
+```
+
+O restante (dashboard, provedores, `gitbook/`, `i18n/`, `cli/`) vem do upstream.
+
+## Como rodar e testar
+
+```bash
+npm ci
+npm run dev                                   # painel em http://localhost:20127
+cd tests && npm ci && npx vitest run unit/multi-tenant-isolation.test.js   # isolamento
+npm run build
+```
+
+## Variáveis de ambiente (só nomes)
+
+`MT_STRICT` (1 = fail-closed), `MT_ADMIN_TOKEN` ou `MT_ADMIN_TOKEN_FILE` (token de serviço do BFF, 32+ caracteres), `JWT_SECRET` (igual em todas as réplicas), `INITIAL_PASSWORD_FILE` (senha do painel do operador), `MT_ALLOW_PRIVATE_URLS` (manter 0 em produção), `DATA_DIR`, `PORT`. Valores ficam em secrets do Docker na VPS.
+
+## Isolamento e segurança
+
+- Chave sem tenant recebe 403 no modo estrito; conexões e combos sem dono nunca aparecem para um tenant.
+- Criar conexão, combo ou chave sem `tenantId` é erro 400. O nome de combo é único por `(tenantId, name)`.
+- Offboarding (`DELETE /api/tenants/:id`) apaga chaves, conexões e combos do tenant.
+- Anti-SSRF: tenants não apontam provedor para loopback ou rede privada.
+- Backup do banco: `deploy/llm-gateway/backup.sh`.
+
+## Como contribuir
+
+Uma branch por tarefa, Conventional Commits em português, teste de isolamento verde. Mudança que mexa na escolha de conexão ou combo exige teste novo no arquivo de isolamento.
+
+---
+
 > ## 🍴 This is a fork — read this first
 >
 > This is a fork of [decolua/9router](https://github.com/decolua/9router) (MIT licensed) adding **real multi-tenant isolation**, built by [Rangel Tech](https://rangeltech.net) for running one shared 9Router instance across several independent customers/tenants.
