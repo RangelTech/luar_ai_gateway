@@ -12,6 +12,23 @@ const origCreate = http.createServer.bind(http);
 // so the request-detail header sanitizer redacts it too.
 const PEER_TOKEN = crypto.randomBytes(24).toString("hex");
 process.env.NINEROUTER_PEER_TOKEN = PEER_TOKEN;
+const VOICE_INTERNAL_SECRET = crypto.randomBytes(32).toString("hex");
+process.env.NINEROUTER_VOICE_INTERNAL_SECRET = VOICE_INTERNAL_SECRET;
+const { attachVoiceRelay } = require("./voice-relay");
+
+async function prepareVoiceAccount({ apiKey, connectionId, voiceLoads, secret, server }) {
+  const port = server.address()?.port;
+  if (!port) throw new Error("Voice server is not listening");
+  const response = await fetch(`http://127.0.0.1:${port}/api/v1/voice/internal/prepare`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "x-9r-voice-internal-secret": secret,
+               "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionId, voiceLoads }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw Object.assign(new Error("Voice account unavailable"), { status: response.status });
+  return response.json();
+}
 
 let backgroundRefreshStarted = false;
 
@@ -73,6 +90,7 @@ http.createServer = (...args) => {
     return handler(req, res);
   };
   const server = origCreate(...rest, wrapped);
+  attachVoiceRelay(server, { secret: VOICE_INTERNAL_SECRET, prepare: prepareVoiceAccount });
   server.once("listening", () => {
     startBackgroundTokenRefreshFromCustomServer();
   });

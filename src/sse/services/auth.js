@@ -32,6 +32,8 @@ export async function getProviderCredentials(provider, excludeConnectionIds = nu
     ? excludeConnectionIds
     : (excludeConnectionIds ? new Set([excludeConnectionIds]) : new Set());
   const preferredConnectionId = options?.preferredConnectionId || null;
+  const requirePreferredConnection = options?.requirePreferredConnection === true;
+  const voiceLoads = options?.voiceLoads && typeof options.voiceLoads === "object" ? options.voiceLoads : null;
   const requestedModel = options?.requestedModel || model;
   // Acquire mutex to prevent race conditions
   const currentMutex = selectionMutex;
@@ -96,6 +98,9 @@ export async function getProviderCredentials(provider, excludeConnectionIds = nu
     // Filter out model-locked, excluded, and Antigravity quota-exhausted connections.
     const availableConnections = connections.filter(c => {
       if (excludeSet.has(c.id)) return false;
+      // The voice endpoint requires Claude OAuth. API-key-only connections
+      // cannot authenticate the upstream speech WebSocket.
+      if (voiceLoads && !c.accessToken && !c.refreshToken) return false;
       if (isModelLockActive(c, model)) return false;
       const enabled = c.providerSpecificData?.enabledModels;
       if (providerId === "codex" && Array.isArray(enabled) && enabled.length && requestedModel && !enabled.includes(requestedModel)) return false;
@@ -162,9 +167,23 @@ export async function getProviderCredentials(provider, excludeConnectionIds = nu
       if (connection) {
         log.info("AUTH", `${provider} | pinned to ${connection.id?.slice(0, 8)} (${connection.name || connection.email || "unnamed"})`);
       }
+      if (!connection && requirePreferredConnection) return null;
     }
     if (connection) {
       // skip strategy
+    } else if (voiceLoads) {
+      // One voice socket owns one account for its lifetime. Prefer the least
+      // occupied eligible connection; break ties by last use to spread starts.
+      connection = [...availableConnections].sort((a, b) => {
+        const loadA = Math.max(0, Number(voiceLoads[a.id]) || 0);
+        const loadB = Math.max(0, Number(voiceLoads[b.id]) || 0);
+        if (loadA !== loadB) return loadA - loadB;
+        const usedA = Date.parse(a.lastUsedAt || "") || 0;
+        const usedB = Date.parse(b.lastUsedAt || "") || 0;
+        if (usedA !== usedB) return usedA - usedB;
+        return (a.priority || 999) - (b.priority || 999);
+      })[0];
+      await updateProviderConnection(connection.id, { lastUsedAt: new Date().toISOString() });
     } else if (strategy === "round-robin") {
       const stickyLimit = providerOverride.stickyRoundRobinLimit || settings.stickyRoundRobinLimit || 3;
 
